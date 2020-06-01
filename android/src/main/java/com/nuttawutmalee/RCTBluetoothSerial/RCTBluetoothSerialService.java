@@ -48,7 +48,7 @@ class RCTBluetoothSerialService {
 
     /**
      * Constructor. Prepares a new RCTBluetoothSerialModule session.
-     * 
+     *
      * @param module Module which handles service events
      */
     RCTBluetoothSerialService(RCTBluetoothSerialModule module) {
@@ -74,7 +74,7 @@ class RCTBluetoothSerialService {
 
     /**
      * Start the ConnectThread to initiate a connection to a remote device.
-     * 
+     *
      * @param device The BluetoothDevice to connect
      */
     synchronized void connect(BluetoothDevice device) {
@@ -203,7 +203,7 @@ class RCTBluetoothSerialService {
 
     /**
      * Start the ConnectedThread to begin managing a Bluetooth connection
-     * 
+     *
      * @param socket The BluetoothSocket on which the connection was made
      * @param device The BluetoothDevice that has been connected
      */
@@ -233,7 +233,7 @@ class RCTBluetoothSerialService {
 
     /**
      * Indicate that the connection attempt failed and notify the UI Activity.
-     * 
+     *
      * @param device The BluetoothDevice that has been failed to connect
      */
     private void connectionFailed(BluetoothDevice device) {
@@ -243,7 +243,7 @@ class RCTBluetoothSerialService {
 
     /**
      * Indicate that the connection was lost and notify the UI Activity.
-     * 
+     *
      * @param device The BluetoothDevice that has been lost
      */
     private void connectionLost(BluetoothDevice device) {
@@ -317,49 +317,67 @@ class RCTBluetoothSerialService {
             mAdapter.cancelDiscovery();
 
             // Make a connection to the BluetoothSocket
+            // Fallback to insecure socket
             try {
-                // This is a blocking call and will only return on a successful connection
-                // or an exception
-                if (D)
-                    Log.d(TAG, "Connecting to socket...");
+                Log.i(TAG, "Trying fallback to insecure socket...");
+                mmSocket = createInsecureBluetoothSocket(mmDevice);
                 mmSocket.connect();
-                if (D)
-                    Log.d(TAG, "Connected");
-            } catch (Exception e) {
-                Log.e(TAG, e.toString());
-                mModule.onError(e);
-
-                // Some 4.1 devices have problems, try an alternative way to connect
-                // See https://github.com/don/RCTBluetoothSerialModule/issues/89
+            } catch (Exception e3) {
+                Log.e(TAG, "Couldn't establish a Bluetooth connection.");
+                mModule.onError(e3);
                 try {
-                    Log.i(TAG, "Trying fallback...");
-                    mmSocket = (BluetoothSocket) mmDevice.getClass()
-                            .getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
-                    mmSocket.connect();
-                    Log.i(TAG, "Connected");
-                } catch (Exception e2) {
-                    Log.e(TAG, e.toString());
-                    mModule.onError(e);
-
-                    // Fallback to insecure socket
-                    try {
-                        Log.i(TAG, "Trying fallback to insecure socket...");
-                        mmSocket = createInsecureBluetoothSocket(mmDevice);
-                        mmSocket.connect();
-                    } catch (Exception e3) {
-                        Log.e(TAG, "Couldn't establish a Bluetooth connection.");
-                        mModule.onError(e3);
-                        try {
-                            mmSocket.close();
-                        } catch (Exception e4) {
-                            Log.e(TAG, "unable to close() socket during connection failure", e3);
-                            mModule.onError(e4);
-                        }
-                        connectionFailed(mmDevice);
-                        return;
-                    }
+                    mmSocket.close();
+                } catch (Exception e4) {
+                    Log.e(TAG, "unable to close() socket during connection failure", e3);
+                    mModule.onError(e4);
                 }
+                connectionFailed(mmDevice);
+                return;
             }
+
+            // try {
+            //     // This is a blocking call and will only return on a successful connection
+            //     // or an exception
+            //     if (D)
+            //         Log.d(TAG, "Connecting to socket...");
+            //     mmSocket.connect();
+            //     if (D)
+            //         Log.d(TAG, "Connected");
+            // } catch (Exception e) {
+            //     Log.e(TAG, e.toString());
+            //     mModule.onError(e);
+
+            //     // Some 4.1 devices have problems, try an alternative way to connect
+            //     // See https://github.com/don/RCTBluetoothSerialModule/issues/89
+            //     try {
+            //         Log.i(TAG, "Trying fallback...");
+            //         mmSocket = (BluetoothSocket) mmDevice.getClass()
+            //                 .getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+            //         mmSocket.connect();
+            //         Log.i(TAG, "Connected");
+            //     } catch (Exception e2) {
+            //         Log.e(TAG, e.toString());
+            //         mModule.onError(e);
+
+            //         // Fallback to insecure socket
+            //         try {
+            //             Log.i(TAG, "Trying fallback to insecure socket...");
+            //             mmSocket = createInsecureBluetoothSocket(mmDevice);
+            //             mmSocket.connect();
+            //         } catch (Exception e3) {
+            //             Log.e(TAG, "Couldn't establish a Bluetooth connection.");
+            //             mModule.onError(e3);
+            //             try {
+            //                 mmSocket.close();
+            //             } catch (Exception e4) {
+            //                 Log.e(TAG, "unable to close() socket during connection failure", e3);
+            //                 mModule.onError(e4);
+            //             }
+            //             connectionFailed(mmDevice);
+            //             return;
+            //         }
+            //     }
+            // }
 
             // Reset the ConnectThread because we're done
             synchronized (RCTBluetoothSerialService.this) {
@@ -447,7 +465,7 @@ class RCTBluetoothSerialService {
 
         /**
          * Write to the connected OutStream.
-         * 
+         *
          * @param buffer The bytes to write
          */
         void write(byte[] buffer) {
